@@ -155,6 +155,14 @@ CLUSTER_DOMAIN=$(oc get ingresses.config.openshift.io cluster \
   error "Could not detect cluster domain."
 info "Cluster domain: ${CLUSTER_DOMAIN}"
 
+# The redirect URI in the Keycloak realm uses the OKD OAuth server hostname:
+#   oauth-openshift.apps.<base-domain>
+# CLUSTER_DOMAIN is already the full apps domain (apps.mycluster.example.com),
+# so we must strip the leading 'apps.' prefix to avoid doubling it.
+# Example: apps.mycluster.example.com → mycluster.example.com
+BASE_DOMAIN="${CLUSTER_DOMAIN#apps.}"
+info "Base domain (for redirect URI): ${BASE_DOMAIN}"
+
 info "Generating OIDC client secret..."
 CLIENT_SECRET=$(openssl rand -base64 32)
 
@@ -391,7 +399,7 @@ fi
 
 render 04-realm-and-oauth.yaml \
   -e "s|KEYCLOAK_HOST|${KEYCLOAK_HOST}|g" \
-  -e "s|CLUSTER_DOMAIN|${CLUSTER_DOMAIN}|g" \
+  -e "s|CLUSTER_DOMAIN|${BASE_DOMAIN}|g" \
   -e "s|CLIENT_SECRET|${CLIENT_SECRET}|g" | \
   grep -v '^\s*#' | \
   oc apply -f - 2>/dev/null || true
