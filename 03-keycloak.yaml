@@ -1,0 +1,55 @@
+---
+# ============================================================
+# 03-keycloak.yaml
+# Deploys the Keycloak CR. The Route is created dynamically
+# by the install script based on KC_HOSTNAME_MODE.
+#
+# Values substituted from keycloak-config.env + runtime:
+#   KEYCLOAK_NAMESPACE : namespace
+#   KC_INSTANCES       : replicas
+#   DB_NAME            : database name
+#   KC_CPU_REQUEST/LIMIT, KC_MEMORY_REQUEST/LIMIT : resources
+#
+# Runtime substitution by install script:
+#   KEYCLOAK_HOST      : final hostname (custom or auto-assigned)
+#   KC_HTTP_BLOCK      : http config block (varies by TLS mode)
+#   KC_PROXY_HEADERS   : xforwarded (edge/auto) or empty (reencrypt)
+# ============================================================
+
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: Keycloak
+metadata:
+  name: keycloak
+  namespace: KEYCLOAK_NAMESPACE
+spec:
+  instances: KC_INSTANCES
+
+  db:
+    vendor: postgres
+    host: postgres-db
+    port: 5432
+    database: DB_NAME
+    usernameSecret:
+      name: keycloak-db-secret
+      key: username
+    passwordSecret:
+      name: keycloak-db-secret
+      key: password
+
+  hostname:
+    hostname: "KEYCLOAK_HOST"
+
+KC_HTTP_BLOCK
+
+KC_PROXY_BLOCK
+
+  ingress:
+    enabled: false
+
+  resources:
+    requests:
+      cpu: KC_CPU_REQUEST
+      memory: KC_MEMORY_REQUEST
+    limits:
+      cpu: KC_CPU_LIMIT
+      memory: KC_MEMORY_LIMIT

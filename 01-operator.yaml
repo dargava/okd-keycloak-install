@@ -1,0 +1,40 @@
+---
+# ============================================================
+# 01-operator.yaml
+# Installs the Keycloak Operator into OKD via OLM.
+#
+# Values substituted from keycloak-config.env:
+#   KEYCLOAK_NAMESPACE        : namespace to install into
+#   OPERATOR_CHANNEL          : OLM channel (fast)
+#   OPERATOR_INSTALL_APPROVAL : Manual or Automatic
+# ============================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: KEYCLOAK_NAMESPACE
+  labels:
+    name: KEYCLOAK_NAMESPACE
+
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: keycloak-operator-group
+  namespace: KEYCLOAK_NAMESPACE
+spec:
+  targetNamespaces:
+    - KEYCLOAK_NAMESPACE
+
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: keycloak-operator
+  namespace: KEYCLOAK_NAMESPACE
+spec:
+  channel: OPERATOR_CHANNEL
+  name: keycloak-operator
+  source: community-operators
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: OPERATOR_INSTALL_APPROVAL

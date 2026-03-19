@@ -1,0 +1,106 @@
+---
+# ============================================================
+# 04-realm-and-oauth.yaml
+# Creates the Keycloak realm and OKD OAuth integration.
+#
+# Values substituted from keycloak-config.env + runtime:
+#   KEYCLOAK_NAMESPACE        : namespace
+#   KC_REALM                  : realm name (okd)
+#   KC_REALM_DISPLAY_NAME     : display name in Keycloak UI
+#   KC_CLIENT_ID              : OIDC client ID
+#   KC_ACCESS_TOKEN_LIFESPAN  : token lifespan in seconds
+#   KC_SSO_SESSION_IDLE       : SSO idle timeout in seconds
+#   KC_SSO_SESSION_MAX        : SSO max lifespan in seconds
+#   KC_IDP_NAME               : name on OKD login page
+#   KC_MAPPING_METHOD         : claim or lookup
+#   KC_PROMPT                 : login prompt behaviour
+#
+# Runtime substitution by install script:
+#   KEYCLOAK_HOST  : Route hostname
+#   CLUSTER_DOMAIN : OKD apps domain
+#   CLIENT_SECRET  : generated OIDC client secret
+# ============================================================
+
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: KC_REALM-realm-import
+  namespace: KEYCLOAK_NAMESPACE
+  labels:
+    app: keycloak
+spec:
+  keycloakCRName: keycloak
+
+  realm:
+    id: KC_REALM
+    realm: KC_REALM
+    displayName: "KC_REALM_DISPLAY_NAME"
+    enabled: true
+
+    loginWithEmailAllowed: true
+    duplicateEmailsAllowed: false
+    resetPasswordAllowed: true
+    editUsernameAllowed: false
+    bruteForceProtected: true
+
+    accessTokenLifespan: KC_ACCESS_TOKEN_LIFESPAN
+    ssoSessionIdleTimeout: KC_SSO_SESSION_IDLE
+    ssoSessionMaxLifespan: KC_SSO_SESSION_MAX
+
+    clients:
+      - clientId: KC_CLIENT_ID
+        name: "OKD Console"
+        enabled: true
+        clientAuthenticatorType: client-secret
+        secret: "CLIENT_SECRET"
+        redirectUris:
+          - "https://oauth-openshift.apps.CLUSTER_DOMAIN/oauth2callback/KC_IDP_NAME"
+        webOrigins:
+          - "+"
+        standardFlowEnabled: true
+        implicitFlowEnabled: false
+        directAccessGrantsEnabled: false
+        protocol: openid-connect
+        fullScopeAllowed: true
+        defaultClientScopes:
+          - web-origins
+          - acr
+          - profile
+          - roles
+          - email
+        optionalClientScopes:
+          - address
+          - phone
+          - offline_access
+          - microprofile-jwt
+
+---
+# The OAuth/cluster resource is NOT applied with oc apply.
+# The install script patches it using oc patch --type=json
+# to append the identity provider without overwriting existing ones.
+# This file is kept for reference — the script reads KC_REALM,
+# KC_CLIENT_ID, KC_IDP_NAME, KC_MAPPING_METHOD, and KC_PROMPT
+# from keycloak-config.env to build the patch dynamically.
+#
+# apiVersion: config.openshift.io/v1
+# kind: OAuth
+# metadata:
+#   name: cluster
+# spec:
+#   identityProviders:
+#     - name: KC_IDP_NAME
+#       mappingMethod: KC_MAPPING_METHOD
+#       type: OpenID
+#       openID:
+#         clientID: KC_CLIENT_ID
+#         clientSecret:
+#           name: keycloak-client-secret
+#         claims:
+#           preferredUsername: [preferred_username]
+#           name: [name]
+#           email: [email]
+#           groups: [groups]
+#         issuer: "https://KEYCLOAK_HOST/realms/KC_REALM"
+#         extraScopes: [email, profile]
+#         extraAuthorizeParameters:
+#           prompt: KC_PROMPT

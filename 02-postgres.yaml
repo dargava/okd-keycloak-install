@@ -1,0 +1,89 @@
+---
+# ============================================================
+# 02-postgres.yaml
+# PostgreSQL StatefulSet backed by NFS persistent storage.
+#
+# Values substituted from keycloak-config.env:
+#   KEYCLOAK_NAMESPACE : namespace
+#   DB_STORAGE_CLASS   : StorageClass name (nfs-storage)
+#   DB_STORAGE_SIZE    : PVC size (10Gi)
+#   DB_ACCESS_MODE     : ReadWriteMany / ReadWriteOnce
+#   DB_USERNAME        : PostgreSQL username
+#   DB_PASSWORD        : PostgreSQL password
+#   DB_NAME            : PostgreSQL database name
+#   DB_IMAGE           : container image (postgres:15)
+#   DB_CPU_REQUEST     : CPU request
+#   DB_CPU_LIMIT       : CPU limit
+#   DB_MEMORY_REQUEST  : memory request
+#   DB_MEMORY_LIMIT    : memory limit
+# ============================================================
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: KEYCLOAK_NAMESPACE
+spec:
+  storageClassName: DB_STORAGE_CLASS
+  accessModes:
+    - DB_ACCESS_MODE
+  resources:
+    requests:
+      storage: DB_STORAGE_SIZE
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql-db
+  namespace: KEYCLOAK_NAMESPACE
+spec:
+  serviceName: postgresql-db-service
+  selector:
+    matchLabels:
+      app: postgresql-db
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: postgresql-db
+    spec:
+      containers:
+        - name: postgresql-db
+          image: DB_IMAGE
+          volumeMounts:
+            - mountPath: /data
+              name: postgres-storage
+          env:
+            - name: POSTGRES_USER
+              value: DB_USERNAME
+            - name: POSTGRES_PASSWORD
+              value: DB_PASSWORD
+            - name: PGDATA
+              value: /data/pgdata
+            - name: POSTGRES_DB
+              value: DB_NAME
+          resources:
+            requests:
+              cpu: DB_CPU_REQUEST
+              memory: DB_MEMORY_REQUEST
+            limits:
+              cpu: DB_CPU_LIMIT
+              memory: DB_MEMORY_LIMIT
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-db
+  namespace: KEYCLOAK_NAMESPACE
+spec:
+  selector:
+    app: postgresql-db
+  ports:
+    - port: 5432
+      targetPort: 5432
